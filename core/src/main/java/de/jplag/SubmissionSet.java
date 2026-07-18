@@ -116,14 +116,16 @@ public class SubmissionSet {
      */
     public void normalizeSubmissions() {
         if (baseCodeSubmission != null) {
+            long startTimeMillis = System.currentTimeMillis();
             baseCodeSubmission.normalize();
+            long durationInMilliseconds = System.currentTimeMillis() - startTimeMillis;
+            tokenizationDuration.addAndGet(durationInMilliseconds);
         }
         ProgressBar progressBar = ProgressBarLogger.createProgressBar(ProgressBarType.TOKEN_SEQUENCE_NORMALIZATION, submissions.size());
         submissions.parallelStream().forEach(submission -> {
             long startTimeMillis = System.currentTimeMillis();
             submission.normalize();
-            long durationInMilliseconds = System.currentTimeMillis() - startTimeMillis;
-            tokenizationDuration.addAndGet(durationInMilliseconds);
+            tokenizationDuration.addAndGet(System.currentTimeMillis() - startTimeMillis);
             progressBar.step();
         });
         progressBar.dispose();
@@ -144,8 +146,7 @@ public class SubmissionSet {
         logger.trace("----- Parsing basecode submission: {}", baseCode.getName());
         long startTimeMillis = System.currentTimeMillis();
         boolean successful = baseCode.parse(options.debugParser(), options.normalize(), options.minimumTokenMatch(), options.analyzeComments());
-        long durationInMilliseconds = System.currentTimeMillis() - startTimeMillis;
-        tokenizationDuration.addAndGet(durationInMilliseconds);
+        tokenizationDuration.addAndGet(System.currentTimeMillis() - startTimeMillis);
         if (!successful) {
             if (baseCode.getState() == SubmissionState.TOO_SMALL) {
                 throw new BasecodeException("Basecode contains %d token(s), which is below the minimum match length (%d)!"
@@ -197,8 +198,7 @@ public class SubmissionSet {
     private void parseSingleSubmission(ProgressBar progressBar, Submission submission) throws LanguageException {
         long startTimeMillis = System.currentTimeMillis();
         boolean successful = submission.parse(options.debugParser(), options.normalize(), options.minimumTokenMatch(), options.analyzeComments());
-        long durationInMilliseconds = System.currentTimeMillis() - startTimeMillis;
-        tokenizationDuration.addAndGet(durationInMilliseconds);
+        tokenizationDuration.addAndGet(System.currentTimeMillis() - startTimeMillis);
         if (!successful) {
             errors.incrementAndGet();
             logger.debug("ERROR -> Submission {} removed with reason {}", submission.getName(), submission.getState());
