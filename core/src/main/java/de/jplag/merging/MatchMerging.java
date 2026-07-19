@@ -3,12 +3,12 @@ package de.jplag.merging;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 
 import de.jplag.JPlagComparison;
 import de.jplag.JPlagResult;
 import de.jplag.Match;
 import de.jplag.Submission;
+import de.jplag.TimeUtil;
 import de.jplag.Token;
 import de.jplag.TokenType;
 import de.jplag.logging.ProgressBar;
@@ -43,20 +43,19 @@ public class MatchMerging {
      * @return JPlagResult containing the merged matches
      */
     public JPlagResult mergeMatchesOf(JPlagResult result) {
-        AtomicLong duration = new AtomicLong(0);
+        TimeUtil.DurationAggregator duration = new TimeUtil.DurationAggregator();
         List<JPlagComparison> comparisons = new ArrayList<>(result.getAllComparisons());
 
         ProgressBar progressBar = ProgressBarLogger.createProgressBar(ProgressBarType.MATCH_MERGING, comparisons.size());
         List<JPlagComparison> comparisonsMerged = comparisons.parallelStream().map(it -> {
-            long startTimeMillis = System.currentTimeMillis();
-            JPlagComparison mergedComparison = mergeMatchesOf(it, progressBar);
-            duration.addAndGet(System.currentTimeMillis() - startTimeMillis);
-            return mergedComparison;
+            try (var _ = duration.measureSubtask()) {
+                return mergeMatchesOf(it, progressBar);
+            }
         }).toList();
         progressBar.dispose();
 
         return new JPlagResult(comparisonsMerged, result.getSubmissions(), result.getTokenizationDuration(),
-                result.getComparisonDuration() + duration.get(), options);
+                result.getComparisonDuration() + duration.getAggregateMilliseconds(), options);
     }
 
     private JPlagComparison mergeMatchesOf(JPlagComparison comparison, ProgressBar progressBar) {

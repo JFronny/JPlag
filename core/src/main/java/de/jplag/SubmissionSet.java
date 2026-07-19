@@ -8,7 +8,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -45,7 +44,7 @@ public class SubmissionSet {
 
     private final JPlagOptions options;
     private final AtomicInteger errors = new AtomicInteger(0);
-    private final AtomicLong tokenizationDuration = new AtomicLong(0);
+    private final TimeUtil.DurationAggregator tokenizationDuration = new TimeUtil.DurationAggregator();
 
     /**
      * Creates a submissions set and parses all submissions.
@@ -116,16 +115,15 @@ public class SubmissionSet {
      */
     public void normalizeSubmissions() {
         if (baseCodeSubmission != null) {
-            long startTimeMillis = System.currentTimeMillis();
-            baseCodeSubmission.normalize();
-            long durationInMilliseconds = System.currentTimeMillis() - startTimeMillis;
-            tokenizationDuration.addAndGet(durationInMilliseconds);
+            try (var _ = tokenizationDuration.measureSubtask()) {
+                baseCodeSubmission.normalize();
+            }
         }
         ProgressBar progressBar = ProgressBarLogger.createProgressBar(ProgressBarType.TOKEN_SEQUENCE_NORMALIZATION, submissions.size());
         submissions.parallelStream().forEach(submission -> {
-            long startTimeMillis = System.currentTimeMillis();
-            submission.normalize();
-            tokenizationDuration.addAndGet(System.currentTimeMillis() - startTimeMillis);
+            try (var _ = tokenizationDuration.measureSubtask()) {
+                submission.normalize();
+            }
             progressBar.step();
         });
         progressBar.dispose();
@@ -144,9 +142,10 @@ public class SubmissionSet {
      */
     private void parseBaseCodeSubmission(Submission baseCode) throws BasecodeException, LanguageException {
         logger.trace("----- Parsing basecode submission: {}", baseCode.getName());
-        long startTimeMillis = System.currentTimeMillis();
-        boolean successful = baseCode.parse(options.debugParser(), options.normalize(), options.minimumTokenMatch(), options.analyzeComments());
-        tokenizationDuration.addAndGet(System.currentTimeMillis() - startTimeMillis);
+        boolean successful;
+        try (var _ = tokenizationDuration.measureSubtask()) {
+            successful = baseCode.parse(options.debugParser(), options.normalize(), options.minimumTokenMatch(), options.analyzeComments());
+        }
         if (!successful) {
             if (baseCode.getState() == SubmissionState.TOO_SMALL) {
                 throw new BasecodeException("Basecode contains %d token(s), which is below the minimum match length (%d)!"
@@ -196,9 +195,10 @@ public class SubmissionSet {
      * Parses a single submission (thread safe).
      */
     private void parseSingleSubmission(ProgressBar progressBar, Submission submission) throws LanguageException {
-        long startTimeMillis = System.currentTimeMillis();
-        boolean successful = submission.parse(options.debugParser(), options.normalize(), options.minimumTokenMatch(), options.analyzeComments());
-        tokenizationDuration.addAndGet(System.currentTimeMillis() - startTimeMillis);
+        boolean successful;
+        try (var _ = tokenizationDuration.measureSubtask()) {
+            successful = submission.parse(options.debugParser(), options.normalize(), options.minimumTokenMatch(), options.analyzeComments());
+        }
         if (!successful) {
             errors.incrementAndGet();
             logger.debug("ERROR -> Submission {} removed with reason {}", submission.getName(), submission.getState());
@@ -211,6 +211,6 @@ public class SubmissionSet {
      * @return the tokenization time in milliseconds
      */
     public long getTokenizationDuration() {
-        return tokenizationDuration.get();
+        return tokenizationDuration.getAggregateMilliseconds();
     }
 }

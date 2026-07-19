@@ -8,7 +8,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +16,7 @@ import de.jplag.JPlagComparison;
 import de.jplag.JPlagResult;
 import de.jplag.Submission;
 import de.jplag.SubmissionSet;
+import de.jplag.TimeUtil;
 import de.jplag.exceptions.ComparisonException;
 import de.jplag.logging.ProgressBar;
 import de.jplag.logging.ProgressBarLogger;
@@ -99,29 +99,32 @@ public class LongestCommonSubsequenceSearch {
      * @throws ComparisonException If a problem arises during comparison.
      */
     public JPlagResult compareSubmissions(SubmissionSet submissionSet) throws ComparisonException {
-        AtomicLong duration = new AtomicLong(0);
+        TimeUtil.DurationAggregator duration = new TimeUtil.DurationAggregator();
 
-        long setupStartMillis = System.currentTimeMillis();
-        // Set up data structures:
-        TokenSequenceMapper tokenSequenceMapper = new TokenSequenceMapper(submissionSet);
-        GreedyStringTiling coreAlgorithm = new GreedyStringTiling(options, tokenSequenceMapper);
+        GreedyStringTiling coreAlgorithm;
+        List<SubmissionTuple> tuples;
+        try (var _ = duration.measureSubtask()) {
+            // Set up data structures:
+            TokenSequenceMapper tokenSequenceMapper = new TokenSequenceMapper(submissionSet);
+            coreAlgorithm = new GreedyStringTiling(options, tokenSequenceMapper);
 
-        // Prepare base code comparisons:
-        if (submissionSet.hasBaseCode()) {
-            compareSubmissionsToBaseCode(coreAlgorithm, submissionSet);
+            // Prepare base code comparisons:
+            if (submissionSet.hasBaseCode()) {
+                compareSubmissionsToBaseCode(coreAlgorithm, submissionSet);
+            }
+
+            tuples = buildComparisonTuples(submissionSet.getSubmissions());
         }
-
-        List<SubmissionTuple> tuples = buildComparisonTuples(submissionSet.getSubmissions());
-        duration.addAndGet(System.currentTimeMillis() - setupStartMillis);
 
         // Compare all submission pairs in parallel:
         List<JPlagComparison> comparisons = new ArrayList<>();
         ProgressBar progressBar = ProgressBarLogger.createProgressBar(ProgressBarType.COMPARING, tuples.size());
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             List<Future<Optional<JPlagComparison>>> futures = tuples.stream().map(tuple -> executor.submit(() -> {
-                long startTimeMillis = System.currentTimeMillis();
-                Optional<JPlagComparison> result = compareSubmissions(coreAlgorithm, tuple.left(), tuple.right());
-                duration.addAndGet(System.currentTimeMillis() - startTimeMillis);
+                Optional<JPlagComparison> result;
+                try (var _ = duration.measureSubtask()) {
+                    result = compareSubmissions(coreAlgorithm, tuple.left(), tuple.right());
+                }
                 progressBar.step();
                 return result;
             })).toList();
@@ -141,7 +144,7 @@ public class LongestCommonSubsequenceSearch {
             progressBar.dispose();
         }
 
-        return new JPlagResult(comparisons, submissionSet, submissionSet.getTokenizationDuration(), duration.get(), options);
+        return new JPlagResult(comparisons, submissionSet, submissionSet.getTokenizationDuration(), duration.getAggregateMilliseconds(), options);
     }
 
 }
