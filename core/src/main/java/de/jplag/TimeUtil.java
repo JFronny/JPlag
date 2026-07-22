@@ -1,5 +1,7 @@
 package de.jplag;
 
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadMXBean;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -23,6 +25,16 @@ public final class TimeUtil {
                 duration.toMillisPart());
     }
 
+    private static final ThreadMXBean THREAD_MX_BEAN = ManagementFactory.getThreadMXBean();
+
+    private static long nanoTime() {
+        if (Thread.currentThread().isVirtual() || !THREAD_MX_BEAN.isThreadCpuTimeEnabled()) {
+            return System.nanoTime();
+        } else {
+            return THREAD_MX_BEAN.getCurrentThreadCpuTime();
+        }
+    }
+
     /**
      * Measures the duration of a task by aggregating the durations of subtasks.
      */
@@ -43,7 +55,7 @@ public final class TimeUtil {
          * @return a {@link AutoCloseable} object representing the open subtask
          */
         public Subtask measureSubtask() {
-            return new Subtask(aggregate, System.nanoTime());
+            return new Subtask(aggregate, nanoTime());
         }
 
         /**
@@ -61,7 +73,7 @@ public final class TimeUtil {
 
             @Override
             public void close() {
-                aggregate.addAndGet(System.nanoTime() - start);
+                aggregate.addAndGet(nanoTime() - start);
             }
         }
     }

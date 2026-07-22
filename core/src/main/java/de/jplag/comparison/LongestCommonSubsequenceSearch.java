@@ -3,11 +3,13 @@ package de.jplag.comparison;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -119,19 +121,26 @@ public class LongestCommonSubsequenceSearch {
         // Compare all submission pairs in parallel:
         List<JPlagComparison> comparisons = new ArrayList<>();
         ProgressBar progressBar = ProgressBarLogger.createProgressBar(ProgressBarType.COMPARING, tuples.size());
-        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            List<Future<Optional<JPlagComparison>>> futures = tuples.stream().map(tuple -> executor.submit(() -> {
+        try {
+            List<CompletableFuture<Optional<JPlagComparison>>> futures = tuples.stream().map(tuple -> CompletableFuture.supplyAsync(() -> {
                 Optional<JPlagComparison> result;
                 try (var _ = duration.measureSubtask()) {
                     result = compareSubmissions(coreAlgorithm, tuple.left(), tuple.right());
                 }
                 progressBar.step();
                 return result;
-            })).toList();
+            }, ForkJoinPool.commonPool())).toList();
 
-            executor.shutdown();
-            if (!executor.awaitTermination(24, TimeUnit.HOURS)) {
-                throw new ComparisonException("Comparison timed out.");
+            CompletableFuture<Void> all = CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).orTimeout(24, TimeUnit.HOURS);
+
+            try {
+                all.join();
+            } catch (CompletionException e) {
+                if (e.getCause() instanceof TimeoutException) {
+                    throw new ComparisonException("Comparison timed out.");
+                } else {
+                    throw e;
+                }
             }
 
             for (Future<Optional<JPlagComparison>> future : futures) {
