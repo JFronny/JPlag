@@ -240,7 +240,7 @@ public class StreamFusionTransformer implements SimpleTransformation {
     /**
      * Writes the loop-based reimplementation of the {@code pipeline} to the {@code builder}.<br>
      * This method handles the final collect step and delegates previous steps to
-     * {@link #addAll(Block.Builder, CodeContext, Step, BiConsumer)}.
+     * {@link #addAll(Block.Builder, CodeContext, Step, BiFunction)}.
      * @param builder the builder to write the pipeline to
      * @param pipeline the pipeline to write
      * @return the builder to continue with
