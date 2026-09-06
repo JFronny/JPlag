@@ -35,17 +35,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
+import java.util.function.DoubleConsumer;
 import java.util.function.DoubleFunction;
 import java.util.function.DoublePredicate;
 import java.util.function.DoubleToIntFunction;
 import java.util.function.DoubleToLongFunction;
 import java.util.function.DoubleUnaryOperator;
 import java.util.function.Function;
+import java.util.function.IntConsumer;
 import java.util.function.IntFunction;
 import java.util.function.IntPredicate;
 import java.util.function.IntToDoubleFunction;
 import java.util.function.IntToLongFunction;
 import java.util.function.IntUnaryOperator;
+import java.util.function.LongConsumer;
 import java.util.function.LongFunction;
 import java.util.function.LongPredicate;
 import java.util.function.LongToDoubleFunction;
@@ -165,6 +170,9 @@ public class StreamFusionTransformer implements SimpleTransformation {
             method(IntStream.class, "filter", IntStream.class, IntPredicate.class),
             method(LongStream.class, "filter", LongStream.class, LongPredicate.class),
             method(DoubleStream.class, "filter", DoubleStream.class, DoublePredicate.class));
+    private static final Set<MethodRef> STREAM_FOR_EACH = Set.of(method(Stream.class, "forEach", void.class, Consumer.class),
+            method(IntStream.class, "forEach", void.class, IntConsumer.class), method(LongStream.class, "forEach", void.class, LongConsumer.class),
+            method(DoubleStream.class, "forEach", void.class, DoubleConsumer.class));
     private static final MethodRef STREAM_TO_LIST = method(Stream.class, "toList", List.class);
     private static final Set<MethodRef> STREAM_TO_ARRAY = Set.of(method(Stream.class, "toArray", Object[].class),
             method(IntStream.class, "toArray", int[].class), method(LongStream.class, "toArray", long[].class),
@@ -203,6 +211,10 @@ public class StreamFusionTransformer implements SimpleTransformation {
             } else {
                 return false;
             }
+        } else if (STREAM_FOR_EACH.contains(invokeOp.invokeReference()) && argOperands(invokeOp).size() == 1
+                && requireSingle(argOperands(invokeOp)) instanceof Op.Result predicate && predicate.op() instanceof JavaOp.LambdaOp lambda) {
+            builder.context().putProperty(invokeOp, new Collect.ForEach(invokeOp, pipeline, lambda));
+            return true;
         } else if (invokeOp.invokeReference().equals(STREAM_TO_LIST) && invokeOp.resultType() instanceof ClassType ct
                 && ct.typeArguments().size() == 1) {
             builder.context().putProperty(invokeOp, new Collect.ToList(invokeOp, pipeline, requireSingle(ct.typeArguments())));
@@ -236,11 +248,19 @@ public class StreamFusionTransformer implements SimpleTransformation {
     private Block.Builder addAll(Block.Builder builder, Collect pipeline) {
         Op.Location location = pipeline.source().location();
         Value resultVariable = switch (pipeline) {
+            case Collect.ForEach forEach -> {
+                builder = addAll(builder, builder.context(), forEach.from(), (value, inner) -> {
+                    inner = inlineOrCall(inner, inner.context(), location, forEach.action(), List.of(value.apply(inner)), null);
+                    return inner;
+                });
+                yield null;
+            }
             case Collect.ToList toList -> {
                 Value newHolder = place(builder, location, new_(LIST_NEW));
                 Value holderVariable = place(builder, location, var(null, parameterized(LIST, toList.elementType()), newHolder));
                 builder = addAll(builder, builder.context(), pipeline.from(), (value, inner) -> {
                     place(inner, location, invoke(LIST_ADD, holderVariable, value.apply(inner)));
+                    return inner;
                 });
                 yield holderVariable;
             }
@@ -259,6 +279,7 @@ public class StreamFusionTransformer implements SimpleTransformation {
                     newSize = place(inner, location, arrayLength(place(inner, location, varLoad(holderVariable))));
                     Value index = place(inner, location, sub(newSize, place(inner, location, constant(INT, 1))));
                     place(inner, location, arrayStoreOp(place(inner, location, varLoad(holderVariable)), index, value.apply(inner)));
+                    return inner;
                 });
                 yield holderVariable;
             }
@@ -268,6 +289,7 @@ public class StreamFusionTransformer implements SimpleTransformation {
                     Value newCount = place(inner, location,
                             add(place(inner, location, varLoad(countVariable)), place(inner, location, constant(INT, 1))));
                     place(inner, location, varStore(countVariable, newCount));
+                    return inner;
                 });
                 yield countVariable;
             }
@@ -276,12 +298,15 @@ public class StreamFusionTransformer implements SimpleTransformation {
                 builder = addAll(builder, builder.context(), pipeline.from(), (value, inner) -> {
                     Value newSum = place(inner, location, add(place(inner, location, varLoad(sumVariable)), value.apply(inner)));
                     place(inner, location, varStore(sumVariable, newSum));
+                    return inner;
                 });
                 yield sumVariable;
             }
         };
-        Value holder = place(builder, location, varLoad(resultVariable));
-        builder.context().mapValue(pipeline.source().result(), holder);
+        if (resultVariable != null) {
+            Value holder = place(builder, location, varLoad(resultVariable));
+            builder.context().mapValue(pipeline.source().result(), holder);
+        }
         return builder;
     }
 
@@ -297,7 +322,7 @@ public class StreamFusionTransformer implements SimpleTransformation {
      * @return the builder to continue with
      */
     private Block.Builder addAll(Block.Builder builder, CodeContext context, Step pipeline,
-            BiConsumer<Function<Block.Builder, Value>, Block.Builder> inner) {
+            BiFunction<Function<Block.Builder, Value>, Block.Builder, Block.Builder> inner) {
         Op.Location location = pipeline.source().location();
         return switch (pipeline) {
             case Step.Begin begin -> {
@@ -315,38 +340,42 @@ public class StreamFusionTransformer implements SimpleTransformation {
                 initBody.entryBlock().add(core_yield(initVariable));
                 Body.Builder loopBody = Body.Builder.of(builder.parentBody(), functionType(JavaType.VOID, CoreType.varType(begin.elementType())),
                         context);
-                inner.accept(b -> place(b, location, varLoad(loopBody.entryBlock().parameters().getFirst())), loopBody.entryBlock());
-                place(loopBody.entryBlock(), location, core_yield());
+                var b = loopBody.entryBlock();
+                b = inner.apply(b1 -> place(b1, location, varLoad(loopBody.entryBlock().parameters().getFirst())), b);
+                place(b, location, core_yield());
                 place(builder, location, JavaOp.enhancedFor(exprBody, initBody, loopBody));
                 yield builder;
             }
-            case Step.Intermediate intermediate -> addAll(builder, context, intermediate.from(), (value, b) -> {
-                switch (intermediate) {
-                    case Step.Intermediate.Filter filter when !containsStatement(filter.predicate.body()) -> b.add(if_(b.parentBody()).if_(b2 -> {
+            case Step.Intermediate intermediate -> addAll(builder, context, intermediate.from(), (value, b) -> switch (intermediate) {
+                case Step.Intermediate.Filter filter when !containsStatement(filter.predicate.body()) -> {
+                    b.add(if_(b.parentBody()).if_(b2 -> {
                         Value predicateVariable = place(b2, location, var(BOOLEAN));
                         b2 = inlineOrCall(b2, context, location, filter.predicate(), List.of(value.apply(b2)), predicateVariable);
                         Value predicateValue = place(b2, location, varLoad(predicateVariable));
                         place(b2, location, core_yield(predicateValue));
                     }).then(b2 -> {
-                        inner.accept(value, b2);
+                        b2 = inner.apply(value, b2);
                         place(b2, location, core_yield());
                     }).else_());
-                    case Step.Intermediate.Filter filter -> {
-                        Value predicateVariable = place(b, location, var(BOOLEAN));
-                        b = inlineOrCall(b, context, location, filter.predicate(), List.of(value.apply(b)), predicateVariable);
-                        b.add(if_(b.parentBody()).if_(b2 -> {
-                            Value predicateValue = place(b2, location, varLoad(predicateVariable));
-                            place(b2, location, core_yield(predicateValue));
-                        }).then(b2 -> {
-                            inner.accept(value, b2);
-                            place(b2, location, core_yield());
-                        }).else_());
-                    }
-                    case Step.Intermediate.Map map -> {
-                        Value mappedVariable = place(b, location, var(map.elementType()));
-                        b = inlineOrCall(b, context, location, map.mapping(), List.of(value.apply(b)), mappedVariable);
-                        inner.accept(b2 -> place(b2, location, varLoad(mappedVariable)), b);
-                    }
+                    yield b;
+                }
+                case Step.Intermediate.Filter filter -> {
+                    Value predicateVariable = place(b, location, var(BOOLEAN));
+                    b = inlineOrCall(b, context, location, filter.predicate(), List.of(value.apply(b)), predicateVariable);
+                    b.add(if_(b.parentBody()).if_(b2 -> {
+                        Value predicateValue = place(b2, location, varLoad(predicateVariable));
+                        place(b2, location, core_yield(predicateValue));
+                    }).then(b2 -> {
+                        b2 = inner.apply(value, b2);
+                        place(b2, location, core_yield());
+                    }).else_());
+                    yield b;
+                }
+                case Step.Intermediate.Map map -> {
+                    Value mappedVariable = place(b, location, var(map.elementType()));
+                    b = inlineOrCall(b, context, location, map.mapping(), List.of(value.apply(b)), mappedVariable);
+                    b = inner.apply(b2 -> place(b2, location, varLoad(mappedVariable)), b);
+                    yield b;
                 }
             });
         };
@@ -490,6 +519,9 @@ public class StreamFusionTransformer implements SimpleTransformation {
 
         default String toText() {
             return from().toText() + " -> " + getClass().getSimpleName() + "(" + source().toText() + ")";
+        }
+
+        record ForEach(JavaOp.InvokeOp source, Step from, JavaOp.LambdaOp action) implements Collect {
         }
 
         record ToList(JavaOp.InvokeOp source, Step from, JavaType elementType) implements Collect {
