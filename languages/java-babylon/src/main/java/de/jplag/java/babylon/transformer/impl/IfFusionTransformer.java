@@ -26,11 +26,11 @@ import jdk.incubator.code.dialect.java.JavaType;
  * {@link SimpleTransformation} that fuses unneeded if statements into their parent.
  */
 @AutoService(SimpleTransformation.class)
-public class IfFuseTransformer implements SimpleTransformation {
+public class IfFusionTransformer implements SimpleTransformation {
     /**
      * Identifier of this transformer.
      */
-    public static final String IDENTIFIER = "if-fuse";
+    public static final String IDENTIFIER = "if-fusion";
 
     @Override
     public String getIdentifier() {

@@ -29,7 +29,7 @@ class Experiment {
         JavaBabylonLanguage babylon = (JavaBabylonLanguage) LanguageLoader.getLanguage("java-babylon").orElseThrow();
 
         babylon.getOptions().getTransformationNames().setValue(
-                "assert-remove,try-with-resources-desugar,copy-elision,stream-fuse,enhanced-for-desugar,for-desugar,optional-elision,conditional-expression-desugar,switch-expression-desugar,constant-propagation,if-fuse,inline,block-normalize,constant-propagation,copy-elision,dead-code-elimination,copy-elision,dead-code-elimination,inline");
+                "assert-remove,try-with-resources-desugar,copy-propagation,stream-fusion,enhanced-for-desugar,for-desugar,optional-elision,conditional-expression-desugar,switch-expression-desugar,constant-propagation,if-fusion,inline,block-normalization,constant-propagation,copy-elision,dead-code-elimination,copy-elision,dead-code-elimination,inline");
         babylon.getOptions().getTokenizerName().setValue("full");
         babylon.getOptions().clearCaches();
         babylon.parse(files, false);

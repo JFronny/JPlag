@@ -5,7 +5,7 @@ import de.jplag.java.babylon.transformer.TransformerTest;
 import de.jplag.java.babylon.transformer.impl.util.DelegatePipelineStep;
 
 /**
- * Unit test for the combination of {@link ConstantPropagationStep}, {@link CopyElisionTransformer}, and
+ * Unit test for the combination of {@link ConstantPropagationStep}, {@link CopyPropagationTransformer}, and
  * {@link DeadCodeEliminationTransformer}.
  */
 public class DeadCodeEliminationTest extends TransformerTest {
@@ -16,7 +16,7 @@ public class DeadCodeEliminationTest extends TransformerTest {
 
     @Override
     protected TransformationPipeline getPipeline() {
-        DelegatePipelineStep copyElision = step(new CopyElisionTransformer());
+        DelegatePipelineStep copyElision = step(new CopyPropagationTransformer());
         DelegatePipelineStep deadCodeElimination = step(new DeadCodeEliminationTransformer());
         return pipeline(new ConstantPropagationStep(), copyElision, deadCodeElimination, copyElision, deadCodeElimination);
     }

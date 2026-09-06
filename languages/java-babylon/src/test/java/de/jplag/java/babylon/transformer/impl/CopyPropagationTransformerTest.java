@@ -4,9 +4,9 @@ import de.jplag.java.babylon.pipeline.TransformationPipeline;
 import de.jplag.java.babylon.transformer.TransformerTest;
 
 /**
- * Unit test for {@link CopyElisionTransformer}.
+ * Unit test for {@link CopyPropagationTransformer}.
  */
-public class CopyElisionTransformerTest extends TransformerTest {
+public class CopyPropagationTransformerTest extends TransformerTest {
     @Override
     protected String getFileName() {
         return "Switch.java";
@@ -14,7 +14,7 @@ public class CopyElisionTransformerTest extends TransformerTest {
 
     @Override
     protected TransformationPipeline getPipeline() {
-        return pipeline(step(new CopyElisionTransformer()));
+        return pipeline(step(new CopyPropagationTransformer()));
     }
 
     @Override

@@ -19,26 +19,26 @@ import jdk.incubator.code.dialect.core.CoreOp;
  * {@link SimpleTransformation} that removes unused variable copies.
  */
 @AutoService(SimpleTransformation.class)
-public class CopyElisionTransformer implements SimpleTransformation {
+public class CopyPropagationTransformer implements SimpleTransformation {
     /**
      * Identifier of this transformer.
      */
-    public static final String IDENTIFIER = "copy-elision";
+    public static final String IDENTIFIER = "copy-propagation";
 
     private final int maxReadUses;
 
     /**
      * Create a new instance with config options loaded from system properties.
      */
-    public CopyElisionTransformer() {
-        this(Integer.parseInt(System.getProperty("jplag.java-babylon.copy-elision.max-read-uses", "1")));
+    public CopyPropagationTransformer() {
+        this(Integer.parseInt(System.getProperty("jplag.java-babylon.copy-propagation.max-read-uses", "1")));
     }
 
     /**
      * Create a new instance.
      * @param maxReadUses the maximum number of reads before a variable is no longer elided
      */
-    public CopyElisionTransformer(int maxReadUses) {
+    public CopyPropagationTransformer(int maxReadUses) {
         this.maxReadUses = maxReadUses;
     }
 

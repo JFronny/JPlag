@@ -4,9 +4,9 @@ import de.jplag.java.babylon.pipeline.TransformationPipeline;
 import de.jplag.java.babylon.transformer.TransformerTest;
 
 /**
- * Another unit test for {@link CopyElisionTransformer}.
+ * Another unit test for {@link CopyPropagationTransformer}.
  */
-public class CopyElisionTransformerTest2 extends TransformerTest {
+public class CopyPropagationTransformerTest2 extends TransformerTest {
     @Override
     protected String getFileName() {
         return "ConditionalExpression.java";
@@ -14,7 +14,7 @@ public class CopyElisionTransformerTest2 extends TransformerTest {
 
     @Override
     protected TransformationPipeline getPipeline() {
-        return pipeline(step(new CopyElisionTransformer(3)));
+        return pipeline(step(new CopyPropagationTransformer(3)));
     }
 
     @Override

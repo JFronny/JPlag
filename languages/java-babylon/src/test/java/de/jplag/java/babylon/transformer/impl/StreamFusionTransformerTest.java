@@ -4,9 +4,9 @@ import de.jplag.java.babylon.pipeline.TransformationPipeline;
 import de.jplag.java.babylon.transformer.TransformerTest;
 
 /**
- * Unit test for {@link StreamFuseTransformer}.
+ * Unit test for {@link StreamFusionTransformer}.
  */
-public class StreamFuseTransformerTest extends TransformerTest {
+public class StreamFusionTransformerTest extends TransformerTest {
     @Override
     protected String getFileName() {
         return "Stream.java";
@@ -14,7 +14,7 @@ public class StreamFuseTransformerTest extends TransformerTest {
 
     @Override
     protected TransformationPipeline getPipeline() {
-        return pipeline(step(new StreamFuseTransformer()), step(new DeadCodeEliminationTransformer()));
+        return pipeline(step(new StreamFusionTransformer()), step(new DeadCodeEliminationTransformer()));
     }
 
     @Override

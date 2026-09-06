@@ -12,17 +12,17 @@ import de.jplag.java.babylon.tokenizer.impl.FullBabylonTokenizer;
 import de.jplag.java.babylon.transformer.TransformationStep;
 import de.jplag.java.babylon.transformer.TransformationStepLoader;
 import de.jplag.java.babylon.transformer.impl.AssertRemoveTransformer;
-import de.jplag.java.babylon.transformer.impl.BlockNormalizeStep;
+import de.jplag.java.babylon.transformer.impl.BlockNormalizationStep;
 import de.jplag.java.babylon.transformer.impl.ConditionalExpressionDesugarTransformer;
 import de.jplag.java.babylon.transformer.impl.ConstantPropagationStep;
-import de.jplag.java.babylon.transformer.impl.CopyElisionTransformer;
+import de.jplag.java.babylon.transformer.impl.CopyPropagationTransformer;
 import de.jplag.java.babylon.transformer.impl.DeadCodeEliminationTransformer;
 import de.jplag.java.babylon.transformer.impl.EnhancedForDesugarTransformer;
 import de.jplag.java.babylon.transformer.impl.ForDesugarTransformer;
-import de.jplag.java.babylon.transformer.impl.IfFuseTransformer;
+import de.jplag.java.babylon.transformer.impl.IfFusionTransformer;
 import de.jplag.java.babylon.transformer.impl.InliningStep;
 import de.jplag.java.babylon.transformer.impl.OptionalElisionTransformer;
-import de.jplag.java.babylon.transformer.impl.StreamFuseTransformer;
+import de.jplag.java.babylon.transformer.impl.StreamFusionTransformer;
 import de.jplag.java.babylon.transformer.impl.SwitchExpressionDesugarTransformer;
 import de.jplag.java.babylon.transformer.impl.TryWithResourcesDesugarTransformer;
 import de.jplag.options.LanguageOption;
@@ -40,11 +40,11 @@ class BabylonOptions extends LanguageOptions {
     private static final Pattern LIST_SEPARATOR_PATTERN = Pattern.compile("\\s*" + Pattern.quote(String.valueOf(LIST_SEPARATOR)) + "\\s*");
 
     private static final String DEFAULT_TRANSFORMATIONS = String.join(", ", AssertRemoveTransformer.IDENTIFIER,
-            TryWithResourcesDesugarTransformer.IDENTIFIER, CopyElisionTransformer.IDENTIFIER, StreamFuseTransformer.IDENTIFIER,
+            TryWithResourcesDesugarTransformer.IDENTIFIER, CopyPropagationTransformer.IDENTIFIER, StreamFusionTransformer.IDENTIFIER,
             EnhancedForDesugarTransformer.IDENTIFIER, ForDesugarTransformer.IDENTIFIER, OptionalElisionTransformer.IDENTIFIER,
             ConditionalExpressionDesugarTransformer.IDENTIFIER, SwitchExpressionDesugarTransformer.IDENTIFIER, ConstantPropagationStep.IDENTIFIER,
-            IfFuseTransformer.IDENTIFIER, InliningStep.IDENTIFIER, BlockNormalizeStep.IDENTIFIER, ConstantPropagationStep.IDENTIFIER,
-            CopyElisionTransformer.IDENTIFIER, DeadCodeEliminationTransformer.IDENTIFIER, CopyElisionTransformer.IDENTIFIER,
+            IfFusionTransformer.IDENTIFIER, InliningStep.IDENTIFIER, BlockNormalizationStep.IDENTIFIER, ConstantPropagationStep.IDENTIFIER,
+            CopyPropagationTransformer.IDENTIFIER, DeadCodeEliminationTransformer.IDENTIFIER, CopyPropagationTransformer.IDENTIFIER,
             DeadCodeEliminationTransformer.IDENTIFIER, InliningStep.IDENTIFIER);
 
     private final LanguageOption<String> transformations = createDefaultOption(OptionType.string(), "transformations",

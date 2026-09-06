@@ -10,11 +10,11 @@ import jdk.incubator.code.dialect.core.NormalizeBlocksTransformer;
  * {@link TransformationStep} that merges redundant blocks and removes unused block parameters.
  */
 @AutoService(TransformationStep.class)
-public class BlockNormalizeStep implements TransformationStep<Void> {
+public class BlockNormalizationStep implements TransformationStep<Void> {
     /**
      * Identifier of this pipeline step.
      */
-    public static final String IDENTIFIER = "block-normalize";
+    public static final String IDENTIFIER = "block-normalization";
 
     @Override
     public String getIdentifier() {

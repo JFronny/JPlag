@@ -46,24 +46,24 @@ public class InliningStep implements TransformationStep<InliningStep.Context> {
      */
     public static final String IDENTIFIER = "inline";
 
-    private final long maxComplexity;
+    private final long maxSize;
     private final boolean dropLocations;
 
     /**
      * Create a new instance with config options loaded from system properties.
      */
     public InliningStep() {
-        this(Long.parseLong(System.getProperty("jplag.java-babylon.inline.max-complexity", "15")),
+        this(Long.parseLong(System.getProperty("jplag.java-babylon.inline.max-size", "15")),
                 Boolean.parseBoolean(System.getProperty("jplag.java-babylon.inline.drop-locations", "true")));
     }
 
     /**
      * Create a new instance.
-     * @param maxComplexity the maximum complexity before methods are no longer inlined
+     * @param maxSize the maximum candidate size before methods are no longer inlined
      * @param dropLocations whether locations should be dropped before inlining
      */
-    public InliningStep(long maxComplexity, boolean dropLocations) {
-        this.maxComplexity = maxComplexity;
+    public InliningStep(long maxSize, boolean dropLocations) {
+        this.maxSize = maxSize;
         this.dropLocations = dropLocations;
     }
 
@@ -178,21 +178,21 @@ public class InliningStep implements TransformationStep<InliningStep.Context> {
      * @return true, if the method should be inlined into call sites
      */
     protected boolean heuristic(CoreOp.FuncOp func, MethodRef methodId) {
-        return complexity(func) <= maxComplexity;
+        return size(func) <= maxSize;
     }
 
     /**
      * Corresponds (roughly) to the number of tokens emitted by
      * {@link de.jplag.java.babylon.tokenizer.impl.FullBabylonTokenizer} for this op.
      * @param op the op to analyze
-     * @return the complexity of this op
+     * @return the size of this op
      */
-    protected long complexity(Op op) {
+    protected long size(Op op) {
         long result = 1;
         for (Body body : op.bodies()) {
             for (Block block : body.blocks()) {
                 for (Op op1 : block.ops()) {
-                    result += complexity(op1);
+                    result += size(op1);
                 }
             }
         }

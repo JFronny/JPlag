@@ -16,7 +16,7 @@ public final class TransformingCodeModelExtractor implements CodeModelExtractor 
     /**
      * Create a new instance.
      * @param delegate the extractor from which the input code model should be sourced
-     * @param transformation the transformation to apply before returning the code model may return null to signal that the
+     * @param transformation the transformation to apply before returning the code model. May return null to signal that the
      * method should be skipped
      */
     public TransformingCodeModelExtractor(CodeModelExtractor delegate, UnaryOperator<CoreOp.FuncOp> transformation) {

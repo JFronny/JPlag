@@ -84,11 +84,11 @@ import jdk.incubator.code.dialect.java.MethodRef;
  * {@link SimpleTransformation} that fuses simple stream operations into loops.
  */
 @AutoService(SimpleTransformation.class)
-public class StreamFuseTransformer implements SimpleTransformation {
+public class StreamFusionTransformer implements SimpleTransformation {
     /**
      * Identifier of this transformer.
      */
-    public static final String IDENTIFIER = "stream-fuse";
+    public static final String IDENTIFIER = "stream-fusion";
 
     @Override
     public String getIdentifier() {

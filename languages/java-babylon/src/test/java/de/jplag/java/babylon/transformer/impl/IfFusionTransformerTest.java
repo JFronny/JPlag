@@ -4,9 +4,9 @@ import de.jplag.java.babylon.pipeline.TransformationPipeline;
 import de.jplag.java.babylon.transformer.TransformerTest;
 
 /**
- * Unit test for {@link IfFuseTransformer}.
+ * Unit test for {@link IfFusionTransformer}.
  */
-public class IfFuseTransformerTest extends TransformerTest {
+public class IfFusionTransformerTest extends TransformerTest {
     @Override
     protected String getFileName() {
         return "If.java";
@@ -14,7 +14,7 @@ public class IfFuseTransformerTest extends TransformerTest {
 
     @Override
     protected TransformationPipeline getPipeline() {
-        return pipeline(step(new IfFuseTransformer()), step(new IfFuseTransformer()));
+        return pipeline(step(new IfFusionTransformer()), step(new IfFusionTransformer()));
     }
 
     @Override
