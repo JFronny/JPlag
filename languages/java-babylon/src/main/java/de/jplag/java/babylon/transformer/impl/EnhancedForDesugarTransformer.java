@@ -4,6 +4,11 @@ import static de.jplag.java.babylon.BabylonUtils.dominates;
 import static de.jplag.java.babylon.BabylonUtils.location;
 import static de.jplag.java.babylon.BabylonUtils.place;
 import static de.jplag.java.babylon.BabylonUtils.requireSingle;
+import static jdk.incubator.code.dialect.core.CoreOp.constant;
+import static jdk.incubator.code.dialect.core.CoreOp.core_yield;
+import static jdk.incubator.code.dialect.core.CoreOp.var;
+import static jdk.incubator.code.dialect.core.CoreOp.varLoad;
+import static jdk.incubator.code.dialect.core.CoreOp.varStore;
 
 import java.util.Iterator;
 import java.util.List;
@@ -82,7 +87,7 @@ public class EnhancedForDesugarTransformer implements SimpleTransformation {
             case ArrayType at -> {
                 Value variable = sourceVarIfSimple(forOp);
                 if (variable == null) {
-                    variable = place(builder, forOp.location(), CoreOp.var(at));
+                    variable = place(builder, forOp.location(), var(at));
                     builder.transformBody(forOp.exprBody(), List.of(), new YieldAssignTransformer(variable, false));
                 } else {
                     variable = builder.context().getValue(variable);
@@ -130,12 +135,16 @@ public class EnhancedForDesugarTransformer implements SimpleTransformation {
     private Body.Builder buildInit(IterableDescriptor descriptor, Body.Builder connectedAncestorBody, CodeContext cc, Body exprBody) {
         Body.Builder init = Body.Builder.of(connectedAncestorBody, CoreType.functionType(descriptor.stateType()), cc);
         switch (descriptor) {
-            case IterableDescriptor.Array array -> place(init.entryBlock(), location(exprBody), CoreOp.core_yield(array.variable()));
+            case IterableDescriptor.Array array -> {
+                Op.Result zero = place(init.entryBlock(), location(exprBody), constant(JavaType.INT, 0));
+                Op.Result variable = place(init.entryBlock(), location(exprBody), var(zero));
+                place(init.entryBlock(), location(exprBody), core_yield(variable));
+            }
             case IterableDescriptor.Iterable iterable -> init.entryBlock().transformBody(exprBody, List.of(), (YieldTransformer) (block, yield) -> {
                 Value result = block.context().getValue(yield.yieldValue());
                 Value iterator = place(block, yield.location(), JavaOp.invoke(iterable.iteratorType(), ITERATOR_CREATE, result));
-                Value state = place(block, yield.location(), CoreOp.var(iterator));
-                place(block, yield.location(), CoreOp.core_yield(state));
+                Value state = place(block, yield.location(), var(iterator));
+                place(block, yield.location(), core_yield(state));
                 return block;
             });
         }
@@ -149,17 +158,17 @@ public class EnhancedForDesugarTransformer implements SimpleTransformation {
         Value state = requireSingle(cond.entryBlock().parameters());
         Op.Result result = switch (descriptor) {
             case IterableDescriptor.Array arrayDesc -> {
-                Value array = place(cond.entryBlock(), location, CoreOp.varLoad(arrayDesc.variable()));
-                Value index = place(cond.entryBlock(), location, CoreOp.varLoad(state));
+                Value array = place(cond.entryBlock(), location, varLoad(arrayDesc.variable()));
+                Value index = place(cond.entryBlock(), location, varLoad(state));
                 Value arrayLength = place(cond.entryBlock(), location, JavaOp.arrayLength(array));
                 yield place(cond.entryBlock(), location, JavaOp.lt(index, arrayLength));
             }
             case IterableDescriptor.Iterable _ -> {
-                Value iterator = place(cond.entryBlock(), location, CoreOp.varLoad(state));
+                Value iterator = place(cond.entryBlock(), location, varLoad(state));
                 yield place(cond.entryBlock(), location, JavaOp.invoke(ITERATOR_HAS_NEXT, iterator));
             }
         };
-        place(cond.entryBlock(), location, CoreOp.core_yield(result));
+        place(cond.entryBlock(), location, core_yield(result));
         return cond;
     }
 
@@ -168,15 +177,15 @@ public class EnhancedForDesugarTransformer implements SimpleTransformation {
         Value state = requireSingle(update.entryBlock().parameters());
         switch (descriptor) {
             case IterableDescriptor.Array _ -> {
-                Value index = place(update.entryBlock(), location, CoreOp.varLoad(state));
-                Value one = place(update.entryBlock(), location, CoreOp.constant(JavaType.INT, 1));
+                Value index = place(update.entryBlock(), location, varLoad(state));
+                Value one = place(update.entryBlock(), location, constant(JavaType.INT, 1));
                 Value incremented = place(update.entryBlock(), location, JavaOp.add(index, one));
-                place(update.entryBlock(), location, CoreOp.varStore(state, incremented));
+                place(update.entryBlock(), location, varStore(state, incremented));
             }
             case IterableDescriptor.Iterable _ -> {
             }
         }
-        place(update.entryBlock(), location, CoreOp.core_yield());
+        place(update.entryBlock(), location, core_yield());
         return update;
     }
 
@@ -189,12 +198,12 @@ public class EnhancedForDesugarTransformer implements SimpleTransformation {
         Value loopValue;
         switch (descriptor) {
             case IterableDescriptor.Array arrayDesc -> {
-                Value array = place(loop.entryBlock(), location, CoreOp.varLoad(arrayDesc.variable()));
-                Value index = place(loop.entryBlock(), location, CoreOp.varLoad(state));
+                Value array = place(loop.entryBlock(), location, varLoad(arrayDesc.variable()));
+                Value index = place(loop.entryBlock(), location, varLoad(state));
                 loopValue = place(loop.entryBlock(), location, JavaOp.arrayLoadOp(array, index));
             }
             case IterableDescriptor.Iterable _ -> {
-                Value iterator = place(loop.entryBlock(), location, CoreOp.varLoad(state));
+                Value iterator = place(loop.entryBlock(), location, varLoad(state));
                 loopValue = place(loop.entryBlock(), location, JavaOp.invoke(ITERATOR_NEXT, iterator));
             }
         }
